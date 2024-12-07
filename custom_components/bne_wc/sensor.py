@@ -36,7 +36,7 @@ CONF_WASTE_WEEKS_TABLE = 'weeks_table'
 CONF_PROPERTY_NUMBER = 'property_number'
 CONF_ICON = 'icon'
 CONF_RECYCLE_ICON = 'recycle_icon'
-
+CONF_TIME_OFFSET = 'time_offset'
 CONF_ALERT_HOURS = 'alert_hours'
 CONF_GREEN_BIN = 'green_bin'
 
@@ -81,14 +81,15 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
     vol.Optional(CONF_ALERT_HOURS, default=DEFAULT_ALERT_HOURS): cv.positive_int,
     vol.Optional(CONF_ICON, default=DEFAULT_ICON): cv.string,
     vol.Optional(CONF_RECYCLE_ICON, default=DEFAULT_RECYCLE_ICON): cv.string,
-    vol.Optional(CONF_GREEN_BIN, default=False): cv.boolean
+    vol.Optional(CONF_GREEN_BIN, default=False): cv.boolean,
+    vol.Optional(CONF_TIME_OFFSET, default=0): cv.positive_int
 })
 
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Get the waste collection sensor."""
     
-    data_normal = BneWasteCollection(config.get(CONF_BASE_URL), config.get(CONF_WASTE_DAYS_TABLE), config.get(CONF_WASTE_WEEKS_TABLE), config.get(CONF_PROPERTY_NUMBER),config.get(CONF_GREEN_BIN),False)
-    data_recycle = BneWasteCollection(config.get(CONF_BASE_URL), config.get(CONF_WASTE_DAYS_TABLE), config.get(CONF_WASTE_WEEKS_TABLE), config.get(CONF_PROPERTY_NUMBER),config.get(CONF_GREEN_BIN),True)
+    data_normal = BneWasteCollection(config.get(CONF_BASE_URL), config.get(CONF_WASTE_DAYS_TABLE), config.get(CONF_WASTE_WEEKS_TABLE), config.get(CONF_PROPERTY_NUMBER),config.get(CONF_GREEN_BIN),False,config.get(CONF_TIME_OFFSET))
+    data_recycle = BneWasteCollection(config.get(CONF_BASE_URL), config.get(CONF_WASTE_DAYS_TABLE), config.get(CONF_WASTE_WEEKS_TABLE), config.get(CONF_PROPERTY_NUMBER),config.get(CONF_GREEN_BIN),True,config.get(CONF_TIME_OFFSET))
     recycleSensorName = config.get(CONF_NAME) + " (Recycle)"
 
     sensors = []
@@ -98,7 +99,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         data_normal, 
         config.get(CONF_NAME),
         config.get(CONF_ICON),
-        config.get(CONF_ALERT_HOURS)
+        (config.get(CONF_ALERT_HOURS) + config.get(CONF_TIME_OFFSET))
     ))
 
     # Add recycle week sensor
@@ -106,7 +107,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
         data_recycle, 
         recycleSensorName,
         config.get(CONF_RECYCLE_ICON),
-        config.get(CONF_ALERT_HOURS)
+        (config.get(CONF_ALERT_HOURS) + config.get(CONF_TIME_OFFSET))
     ))
 
     add_devices(sensors)
@@ -151,8 +152,8 @@ class BneWasteCollectionSensor(Entity):
             ATTR_HOUSE_NUMBER: collection_details[ATTR_HOUSE_NUMBER],
             ATTR_COLLECTION_DAY: collection_details[ATTR_COLLECTION_DAY],
             ATTR_COLLECTION_ZONE: collection_details[ATTR_COLLECTION_ZONE],
-            ATTR_NEXT_COLLECTION_DATE: collection_details[ATTR_NEXT_COLLECTION_DATE],
             ATTR_EXTRA_BIN: collection_details[ATTR_EXTRA_BIN],
+            ATTR_NEXT_COLLECTION_DATE: collection_details[ATTR_NEXT_COLLECTION_DATE],
             ATTR_DUE_IN: collection_details[ATTR_DUE_IN],
             ATTR_RECYCLE_WEEK: collection_details[ATTR_RECYCLE_WEEK]
         }
@@ -216,7 +217,7 @@ class BneWasteCollectionSensor(Entity):
 class BneWasteCollection(object):
     """The Class for handling the data retrieval."""
 
-    def __init__(self, base_url, days_table, weeks_table, property_number, green_bin, recycle_week):
+    def __init__(self, base_url, days_table, weeks_table, property_number, green_bin, recycle_week, time_offset):
         """Initialize the info object."""
         self._base_url = base_url
         self._days_table = days_table
@@ -224,6 +225,7 @@ class BneWasteCollection(object):
         self._property_number = property_number
         self._green_bin = green_bin
         self._recycle_week = recycle_week
+        self._time_offset = time_offset
         self.info = {}
         
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
@@ -260,10 +262,20 @@ class BneWasteCollection(object):
 
                     collection_day_no = strptime(collection[ATTR_COLLECTION_DAY],'%A').tm_wday
                     current_day_no = datetime.today().weekday()
+                    current_time = datetime.now()
                     if collection_day_no > current_day_no:
-                        collection[ATTR_NEXT_COLLECTION_DATE] = (date_today() + timedelta(days=collection_day_no-current_day_no)).isoformat()
+                        # Future collection day in the same week
+                        collection[ATTR_NEXT_COLLECTION_DATE] = (date_today() + timedelta(days=collection_day_no - current_day_no)).replace(hour=self._time_offset, minute=0, second=0, microsecond=0).isoformat()
+                    elif collection_day_no == current_day_no:
+                        # Today's bin collection day, keep it until the cutoff time
+                        if current_time.hour < self._time_offset:
+                            collection[ATTR_NEXT_COLLECTION_DATE] = (date_today()).replace(hour=self._time_offset, minute=0, second=0, microsecond=0).isoformat()
+                        else:
+                            # After cutoff, advance to next week
+                            collection[ATTR_NEXT_COLLECTION_DATE] = (date_today() + timedelta(days=WEEK_DAYS)).replace(hour=self._time_offset, minute=0, second=0, microsecond=0).isoformat()
                     else:
-                        collection[ATTR_NEXT_COLLECTION_DATE] = (date_today() + timedelta(days=(WEEK_DAYS+collection_day_no)-current_day_no)).isoformat()
+                        # Past collection day, move to next week
+                        collection[ATTR_NEXT_COLLECTION_DATE] = (date_today() + timedelta(days=(WEEK_DAYS + collection_day_no) - current_day_no)).replace(hour=self._time_offset, minute=0, second=0, microsecond=0).isoformat()
         
                 else:
                     _LOGGER.error('Collection day dataset zero rows returned')
@@ -309,6 +321,7 @@ class BneWasteCollection(object):
                         collection[ATTR_EXTRA_BIN] = ''
                     if len(df.index) > 0:
                         # If row returned then next collection date is recycling week so advance collection date one week
+                        # GREEN ???
                         collection[ATTR_NEXT_COLLECTION_DATE] = (parse(collection[ATTR_NEXT_COLLECTION_DATE]) + timedelta(days=WEEK_DAYS)).isoformat()
 
                 if is_valid_date(collection[ATTR_NEXT_COLLECTION_DATE]):
