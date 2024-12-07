@@ -45,6 +45,7 @@ Configuration variables:
 - **icon** (*Optional*): Name of the icon to use for the "normal" week sensor (defaults to mdi:trash-can)
 - **recycle_icon** (*Optional*): Name of the icon to use for the "recycle" week sensor (defaults to mdi:recycle)
 - **alert_hours** (*Optional*): Number of hours before bin day to raise alert (defaults to 12)
+- **time_offset** (*Optional*): Number of hours past 12am to continue to class Collection Date as active (defaults to 0)
 - **green_bin** (*Optional*): true/false to indicate if you have a green bin (reflected in the Extra Bin attribute for the "normal" weeks
 
 ## Sensor
@@ -96,18 +97,3 @@ Home assistant alerts that use notifications can be setup to monitor the state o
     notifiers:
       - persistent_notification
 ```
-## Reporting an Issue
-
-1. Setup your logger to print debug messages for this component using:
-```yaml
-logger:
-  default: info
-  logs:
-    custom_components.bne_wc: debug
-```
-2. Restart HA
-3. Verify you're still having the issue
-4. File an issue in this Github Repository containing your HA log (Developer section > Info > Load Full Home Assistant Log)
-   * You can paste your log file at pastebin https://pastebin.com/ and submit a link.
-   * Please include details about your setup (Pi, NUC, etc, docker?, HASSOS?)
-   * The log file can also be found at `/<config_dir>/home-assistant.log`
