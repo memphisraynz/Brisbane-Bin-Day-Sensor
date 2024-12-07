@@ -1,5 +1,7 @@
 # Brisbane Bin Day Sensor
 
+All credit goes to @marklfoley for this project. this code was forked with quality of life changes for myself.
+
 This project creates two new Home Assistant binary sensors that provide details of bin collections in the Brisbane City Council area.  One sensor is for the "normal" (or optionally green bin) week while the other is for the recycle (yellow bin) week.  Two sensors are used to enable the creation of alerts in Home Assistant with names specific to the weeks.
 
 While most Councils provide details of their waste collection schedules via their Open Data portals there is no consistency or standards in how the data is structured (especially when it comes to the recycle week determination).  Therefore, it is not possible to create a generic sensor but you are welcome to fork this code and cusrtomize it for your particular Council. 
