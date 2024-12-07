@@ -88,16 +88,17 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
 def setup_platform(hass, config, add_devices, discovery_info=None):
     """Get the waste collection sensor."""
     
-    data_normal = BneWasteCollection(config.get(CONF_BASE_URL), config.get(CONF_WASTE_DAYS_TABLE), config.get(CONF_WASTE_WEEKS_TABLE), config.get(CONF_PROPERTY_NUMBER),config.get(CONF_GREEN_BIN),False,config.get(CONF_TIME_OFFSET))
+    data_garden = BneWasteCollection(config.get(CONF_BASE_URL), config.get(CONF_WASTE_DAYS_TABLE), config.get(CONF_WASTE_WEEKS_TABLE), config.get(CONF_PROPERTY_NUMBER),config.get(CONF_GREEN_BIN),False,config.get(CONF_TIME_OFFSET))
     data_recycle = BneWasteCollection(config.get(CONF_BASE_URL), config.get(CONF_WASTE_DAYS_TABLE), config.get(CONF_WASTE_WEEKS_TABLE), config.get(CONF_PROPERTY_NUMBER),config.get(CONF_GREEN_BIN),True,config.get(CONF_TIME_OFFSET))
+    gardenSensorName = config.get(CONF_NAME) + " (Garden)"
     recycleSensorName = config.get(CONF_NAME) + " (Recycle)"
 
     sensors = []
 
     # Add normal week sensor
     sensors.append(BneWasteCollectionSensor(
-        data_normal, 
-        config.get(CONF_NAME),
+        data_garden, 
+        gardenSensorName,
         config.get(CONF_ICON),
         (config.get(CONF_ALERT_HOURS) + config.get(CONF_TIME_OFFSET))
     ))
